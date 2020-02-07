@@ -33,7 +33,7 @@ idx = np.append(np.diff(pos) > 1, True)
 en = pos[idx] + 139
 ln = en - st
 
-peaks = peakdetect(occ, lookahead=40)
+peaks = peakdetect(occ, lookahead=50)
 indexesMax = np.array([peaks[0][el][0] for el in range(len(peaks[0]))])
 indexesMax = indexesMax[np.array([np.where(indexesMax > st[i])[0][0] for i in range(st.size-1)])]
 peak = np.zeros(st.size-1)
