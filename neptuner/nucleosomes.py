@@ -2,9 +2,10 @@ import sys, os
 import pandas as pd
 import numpy as np
 
+###-MAIN FUNCTION-###
 
 def nucleosomes(ipt, opt):
-    # Identify nucleosome coordinates, including well-defined and fuzzy nucleosomes.
+    ## Identify nucleosome coordinates from profile, including well-defined and fuzzy nucleosomes.
 
     # Assertions on parameters
     # Input is a string and a bedgraph file
@@ -55,9 +56,9 @@ def nucleosomes(ipt, opt):
 
     # Writing output file
     pd.DataFrame({'start': nucleosomes[0], 'end': nucleosomes[1], "length": nucleosomes[2]}).to_csv(opt, index=False)
-
     return
 
+###-INTERNAL FUNCTIONS-###
 
 def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
     """
@@ -158,6 +159,9 @@ def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
     return maxtab, mintab
 
 def nucleosome_conditions(s, e, ma, mi):
+    # Selects indexes of well-defined nucleosomes, setting some conditions:
+    # nuclesomes must not overlap and peak height must be at least twice as high as the sorrounding minima
+
     # Setting conditions
     # Overlapping nucleosomes on the right
     olap_r = s[1:] > e[:-1]  # parte dal -primo
@@ -171,14 +175,16 @@ def nucleosome_conditions(s, e, ma, mi):
     return np.where(olap_r[:-1] & olap_l[:-1] & l_h_check[:-1] & r_h_check[1:])[0] + 1
 
 def well_defined(s, e, cnd):
-    # Identify well-defined peaks
+    # Identify well-defined peaks coordinates
+
     wdst = s[cnd]
     wden = e[cnd]
     wdln = wden - wdst
     return np.array([wdst, wden, wdln])
 
 def fuzzy(s, e, cnd):
-    # Identify fuzzy peaks
+    # Identify fuzzy peaks coordinates
+
     fzst = np.append(1, s[cnd[np.where(np.diff(cnd) - 1 > 1)[0]] + 1])
     fzen = np.append(e[cnd[np.where(np.diff(cnd) - 1 > 1)[0]] - 1][0],
                      e[cnd[np.where(np.diff(cnd) - 1 > 1)[0] + 1] - 1])  # to fix one number in append
@@ -186,7 +192,8 @@ def fuzzy(s, e, cnd):
     return np.array([fzst, fzen, fzln])
 
 def rest(s, e, cnd):
-    # Identify rest of peaks
+    # Identify rest of peaks (special case)
+
     rest = cnd[np.where(np.diff(cnd) - 1 == 1)[0]] + 1
     restst = s[rest]
     resten = e[rest]
@@ -195,6 +202,7 @@ def rest(s, e, cnd):
 
 def nucleosome_coordinates(wd, fz,rs):
     # List all nucleosomes coordinates
+
     nucst = np.append(wd[0], fz[0])
     nucst = np.append(nucst, rs[0])
     nucst = np.sort(nucst)
@@ -205,9 +213,10 @@ def nucleosome_coordinates(wd, fz,rs):
     nucln = nucen - nucst
     return np.array([nucst, nucen, nucln])
 
+###-END FUNCTIONS-###
 
-
-
+# User parameters
 input = sys.argv[1]
 output = sys.argv[2]
+# Call main function
 nucleosomes(input, output)

@@ -3,7 +3,11 @@ import pandas as pd
 import numpy as np
 import sys, os, math
 
+###-MAIN FUNCTION-###
+
 def profile(ipt, opt):
+    ## Calculates the nucleosome profile from bed file containing read coordinates
+
     # Assertions on parameters
     # Input is a string and a bed file
     assert isinstance(ipt, str)
@@ -42,6 +46,7 @@ def profile(ipt, opt):
                   'end': np.arange(norm_prof.size) + 2, "score": norm_prof}).to_csv(opt, index=False, header=False)
     return
 
+###-INTERNAL FUNCTIONS-###
 
 def bedfile_preproc(bfi):
     # It loads the csv file given by the user, name the fields and filters reads shorter than 100bp or
@@ -125,18 +130,14 @@ def triangle(tot, st, en, co):
     tot[(st - co):(en + 1 - co)] = tot[(st - co):(en + 1 - co)] + curtrg
     return tot
 
-
 def normalize(pr):
     # Normalize the final profile so that is in the range [0, 1]
     return np.divide(pr, max(pr))
 
-
-#tsti = time.time()
-#
-#bfi='/home/pejo/Scrivania/nept_pattern/correct_files/chr1.bed'
-
+###-END FUNCTIONS-###
 
 # User parameteres
 input = sys.argv[1]
 output = sys.argv[2]
+# Call main function
 profile(input, output)
