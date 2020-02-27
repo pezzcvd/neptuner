@@ -3,6 +3,45 @@ import pandas as pd
 import numpy as np
 import sys, os, math
 
+def profile(ipt, opt):
+    # Assertions on parameters
+    # Input is a string and a bed file
+    assert isinstance(ipt, str)
+    assert os.path.isfile(ipt)
+    assert ipt.endswith(".bed")
+    # Output is a bedgraph file
+    assert isinstance(opt, str)
+    assert opt.endswith(".bedgraph")
+
+    # Number of cpus
+    ncpu = mp.cpu_count()
+    # Bedfile loading and preprocessing
+    global bedfile
+    bedfile = bedfile_preproc(ipt)
+    chr = bedfile["chromosome"][0]
+    # Identifying highest coordinate
+    fin = np.max(bedfile["end"])
+    # final array declaration
+    global old
+    old = np.zeros(fin + 1)
+    # Rows per subfile (used in the subfile function)
+    global rps
+    rps = math.ceil(bedfile.shape[0] / ncpu)
+
+    # Parallel profile computation
+    pool = mp.Pool(ncpu)  # mp.cpu_count())
+    prof = pool.map(subfiles, [p for p in range(ncpu)])
+    pool.close()
+    prof = np.sum(prof, axis=0)
+
+    # Normalization
+    norm_prof = normalize(prof)
+
+    # Write output
+    pd.DataFrame({'chr': np.array(chr), 'start': np.arange(norm_prof.size) + 1,
+                  'end': np.arange(norm_prof.size) + 2, "score": norm_prof}).to_csv(opt, index=False, header=False)
+    return
+
 
 def bedfile_preproc(bfi):
     # It loads the csv file given by the user, name the fields and filters reads shorter than 100bp or
@@ -39,6 +78,9 @@ def subfiles(i):
     # N.B. The function takes only one parameter and refers to the global environment "rps" value
     # to correctly use the pool.map function from the multiparallel library.
 
+    global bedfile
+    global rps
+    global old
     # Identifies the subfile
     subf = bedfile.iloc[i * rps: rps * (i + 1)]
     # Defines the subfile result file initialized with zeros
@@ -97,38 +139,4 @@ def normalize(pr):
 # User parameteres
 input = sys.argv[1]
 output = sys.argv[2]
-
-# Assertions on parameters
-# Input is a string and a bed file
-assert isinstance(input, str)
-assert os.path.isfile(input)
-assert input.endswith(".bed")
-# Output is a bedgraph file
-assert isinstance(output, str)
-assert output.endswith(".bedgraph")
-
-# Number of cpus
-ncpu = mp.cpu_count()
-# Bedfile loading and preprocessing
-bedfile = bedfile_preproc(input)
-chr = bedfile["chromosome"][0]
-# Identifying highest coordinate
-fin = np.max(bedfile["end"])
-# final array declaration
-old = np.zeros(fin + 1)
-# Rows per subfile (used in the subfile function)
-rps = math.ceil(bedfile.shape[0] / ncpu)
-
-# Parallel profile computation
-pool = mp.Pool(ncpu)  # mp.cpu_count())
-prof = pool.map(subfiles, [p for p in range(ncpu)])
-pool.close()
-prof = np.sum(prof, axis=0)
-
-# Normalization
-norm_prof = normalize(prof)
-
-# Write output
-pd.DataFrame({'chr': np.array(chr), 'start': np.arange(norm_prof.size) + 1,
-              'end': np.arange(norm_prof.size) + 2, "score": norm_prof}).to_csv(output, index=False, header=False)
-
+profile(input, output)

@@ -4,6 +4,8 @@ import numpy as np
 
 
 def nucleosomes(ipt, opt):
+    # Identify nucleosome coordinates, including well-defined and fuzzy nucleosomes.
+
     # Assertions on parameters
     # Input is a string and a bedgraph file
     assert isinstance(ipt, str)
@@ -205,59 +207,7 @@ def nucleosome_coordinates(wd, fz,rs):
 
 
 
-# User parameters
+
 input = sys.argv[1]
 output = sys.argv[2]
-
 nucleosomes(input, output)
-'''
-# Assertions on parameters
-# Input is a string and a bedgraph file
-assert isinstance(input, str)
-assert os.path.isfile(input)
-assert input.endswith(".bedgraph")
-# Output is a bedgraph file
-assert isinstance(output, str)
-assert output.endswith(".txt")
-
-# Read the input file
-prof = pd.read_csv(input, header=None)
-assert prof.shape[1] == 4
-assert prof[0].unique().size == 1
-assert isinstance(prof[0][0], str)
-# Second column (start) is integer
-occ = np.array(prof[1])
-assert all([isinstance(occ[i], np.int64) for i in range(prof.shape[0])])
-# Third column (end) is integer
-occ = np.array(prof[2])
-assert all([isinstance(occ[i], np.int64) for i in range(prof.shape[0])])
-# Third column (end) is integer
-occ = np.array(prof[3])
-assert all([isinstance(occ[i], np.float64) for i in range(prof.shape[0])])
-occ[occ < 0.05] = 0
-
-# finds indexes of peaks above the threshold (dummy, very low value)
-# and with at least 50bp distance ideal to remove little bumps
-peaks = peakdetect(occ, lookahead=50)
-
-# Get maximum positions
-indexesMax = np.array([peaks[0][el][0] for el in range(len(peaks[0]))])
-# Get minimum positions
-indexesMin = np.array([peaks[1][el][0] for el in range(len(peaks[1]))])
-# Get maximum values
-valsMax = np.array([peaks[0][el][1] for el in range(len(peaks[0]))])
-# Get minimum values
-valsMin = np.array([peaks[1][el][1] for el in range(len(peaks[1]))])
-# Establish nucleosome intervals [max - 75, max + 75]
-st = indexesMax - 75
-en = indexesMax + 75
-
-fcond = nucleosome_conditions(st, en, valsMax, valsMin)
-well_defined_peaks = well_defined(st, en, fcond)
-fuzzy_peaks = fuzzy(st, en, fcond)
-rest_peaks = rest(st, en, fcond)
-nucleosomes = nucleosome_coordinates(well_defined_peaks, fuzzy_peaks, rest_peaks)
-
-# Writing output file
-pd.DataFrame({'start': nucleosomes[0], 'end': nucleosomes[1], "length": nucleosomes[2]}).to_csv(output, index=False)
-'''
