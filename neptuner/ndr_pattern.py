@@ -1,13 +1,39 @@
-import os
+import os, sys
 import pandas as pd
 import numpy as np
 
-annotation = '/home/pejo/Scrivania/nept_pattern/annotation.csv'
-profile = '/home/pejo/Scrivania/chr1.bedgraph'
-nucleosome = "/home/pejo/neptuner_prj/neptuner/neptuner/nucl1.csv"
-chr_name = "ChrI_A_nidulans_FGSC_A4"
-output = "/home/pejo/nepttest/finalannot.csv"
+###-MAIN FUNCTION-###
 
+def ndr_pattern(annotation, profile, nucleosome, chr_name, output):
+    input_controls(annotation, profile, nucleosome, chr_name, output)
+    # Read input files
+    annot = pd.read_csv(annotation)
+    # Select one chromosome and subselect annotation file
+    annot = annot.loc[annot.seqnames == chr_name,]
+    # Sort genes
+    annot = annot.sort_values(by=["start", "end"])
+    # Add transcription starting site information
+    annot["tss"] = np.sort(np.append(annot["start"][(annot['strand'] == "+")],
+                                     annot["end"][(annot['strand'] == "-")]))
+    prof = pd.read_csv(profile, header=None)
+    prof = np.array(prof[3])
+    nucl = pd.read_csv(nucleosome)
+
+    maxima = extrema(prof)
+
+    promoters = promoter(annot)
+    # Set intervals for nucleosomes and promoters
+    nucint = np.array([pd.Interval(a, b) for a, b in zip(nucl["start"], nucl["end"])])
+    promint = np.array([pd.Interval(a, b) for a, b in zip(promoters["start"], promoters["end"])])
+    # Calculate info for plus1 and minus peaks
+    pm_peaks = [plusminus1(r, promoters, nucl, promint, nucint, maxima) for r in range(1, promoters.shape[0])]
+
+    new_annot = extended_annotation(annot, pm_peaks, promoters)
+    # DIRE PATTERN SI/NO
+    new_annot.to_csv(output, index=False)
+    return
+
+###-INTERNAL FUNCTIONS-###
 
 def input_controls(a, p, n, c, o):
     # Assertions on parameters
@@ -275,69 +301,6 @@ def plusminus1(i, p, nu, pi, ni, mx):
     else:
         return np.nan, np.nan, np.nan, np.nan
 
-'''
-def plusminus1(i, p, n, pi, ni, mc):
-    # positions of nucleosomes that overlap the promoter region
-    olaps = np.where(np.array([pi[i].overlaps(n) for n in ni]))[0]
-    # If there are overlaps
-    if olaps.shape[0] > 0:
-        # Positive strand
-        if p.iloc[i]["strand"] == "+":
-            # Number of nucleosomes in the overlap
-            nnuc = n.iloc[olaps].shape[0] -1
-            # Candidates are last three nucleosomes in the overlap region plus the following one
-            candidates = n.iloc[olaps[nnuc] - 2:olaps[nnuc] + 2]
-            # Takes position of max distance between peaks in the promoter region
-            # Index of minus1 peaks
-            idx = int(np.argmax(np.diff(np.intersect1d(mc[mc < np.max(candidates["end"])],
-                                                   mc[mc > np.min(candidates["start"])]))))  # maxend and minstart
-            # cddm = candidate max, cddp = candidate peak
-            # Identify candidates in a window
-            cddm = np.intersect1d(mc[mc < np.max(candidates["end"])],
-                                  mc[mc > np.min(candidates["start"])])[idx]
-            cddm = pd.Interval(cddm, cddm)
-            cddp = np.array([pd.Interval(a, b) for a, b in zip(candidates["start"], candidates["end"])])
-            # Saving plus1 and minus1 coordinates
-            # If the real maximum is among the candidates
-            if np.where(np.array([i.overlaps(cddm) for i in cddp]))[0][0] >= candidates.shape[0] - 1:
-                minus1 = candidates.iloc[candidates.shape[0] - 2]
-                plus1 = candidates.iloc[candidates.shape[0] - 1]
-            # Otherwise
-            else:
-                minus1 = candidates.iloc[np.where(np.array([i.overlaps(cddm) for i in cddp]))[0][0]]
-                # following peak is plus1
-                plus1 = candidates.iloc[np.where(np.array([i.overlaps(cddm) for i in cddp]))[0][0] + 1]
-        # Negative strand
-        else:
-            # Define candidates
-            candidates = n.iloc[olaps[0] - 1:olaps[0] + 3]
-            if np.intersect1d(mc[mc < np.max(candidates["end"])],
-                              mc[mc > np.min(candidates["start"])]).size == 1:
-                cddm = np.intersect1d(mc[mc < np.max(candidates["end"])],
-                                      mc[mc > np.min(candidates["start"])])[0]
-            else:
-                idx = int(np.argmax(np.diff(np.intersect1d(mc[mc < np.max(candidates["end"])],
-                                                           mc[mc > np.min(candidates["start"])]))))  # maxend and minstart
-                cddm = np.intersect1d(mc[mc < np.max(candidates["end"])],
-                                      mc[mc > np.min(candidates["start"])])[idx]
-            # cddm = candidate max, cddp = candidate peak
-            # Identify candidates in a window
-            cddm = pd.Interval(cddm, cddm)
-            cddp = np.array([pd.Interval(a, b) for a, b in zip(candidates["start"], candidates["end"])])
-            # Saving plus1 and minus1 coordinates
-            # If the real maximum is among the candidates
-            if np.where(np.array([i.overlaps(cddm) for i in cddp]))[0][0] >= candidates.shape[0] - 1:
-                plus1 = candidates.iloc[candidates.shape[0] - 2]
-                minus1 = candidates.iloc[candidates.shape[0] - 1]
-            # Otherwise
-            else:
-                plus1 = candidates.iloc[np.where(np.array([i.overlaps(cddm) for i in cddp]))[0][0]]
-                minus1 = candidates.iloc[np.where(np.array([i.overlaps(cddm) for i in cddp]))[0][0] + 1]
-        return plus1["start"], plus1["end"], minus1["start"], minus1["end"]
-    # No overlaps
-    else:
-        return np.nan, np.nan, np.nan, np.nan
-'''
 
 def extended_annotation(a, r, p):
     newinfo = pd.DataFrame({'plus1st': np.array([r[c][0] for c in range(len(r))]),
@@ -348,7 +311,9 @@ def extended_annotation(a, r, p):
                                               np.array([r[c][3] for c in range(len(r))]),
                                               np.array([r[c][2] for c in range(len(r))]) -
                                               np.array([r[c][1] for c in range(len(r))]))})
-
+    newinfo["ndr_pattern"] = (newinfo["plus1en"] - newinfo["plus1st"] == 150) & \
+                             (newinfo["minus1en"] - newinfo["minus1st"] == 150) & \
+                             (newinfo["ndr"] > 40)
     a["pStart"] = p["start"]
     a["pEnd"] = p["end"]
 
@@ -357,33 +322,12 @@ def extended_annotation(a, r, p):
     finalannot = finalannot.join(newinfo)
     return finalannot
 
+###-END FUNCTIONS-###
 
-input_controls(annotation, profile, nucleosome, chr_name, output)
-# Read input files
-annot = pd.read_csv(annotation)
-# Select one chromosome and subselect annotation file
-annot = annot.loc[annot.seqnames == chr_name, ]
-# Sort genes
-annot = annot.sort_values(by=["start", "end"])
-# Add transcription starting site information
-annot["tss"] = np.sort(np.append(annot["start"][(annot['strand'] == "+")],
-                                 annot["end"][(annot['strand'] == "-")]))
-prof = pd.read_csv(profile, header=None)
-prof = np.array(prof[3])
-nucl = pd.read_csv(nucleosome)
+annotation = sys.argv[1]
+profile = sys.argv[2]
+nucleosome = sys.argv[3]
+chr_name = sys.argv[4]
+output = sys.argv[5]
 
-maxima = extrema(prof)
-
-promoters = promoter(annot)
-# Set intervals for nucleosomes and promoters
-nucint = np.array([pd.Interval(a, b) for a, b in zip(nucl["start"], nucl["end"])])
-promint = np.array([pd.Interval(a, b) for a, b in zip(promoters["start"], promoters["end"])])
-# Calculate info for plus1 and minus peaks
-pm_peaks = [plusminus1(r, promoters, nucl, promint, nucint, maxima) for r in range(1, promoters.shape[0])]
-
-new_annot = extended_annotation(annot, pm_peaks, promoters)
-# DIRE PATTERN SI/NO
-new_annot.to_csv(output)
-
-
-
+ndr_pattern(annotation, profile, nucleosome, chr_name, output)
