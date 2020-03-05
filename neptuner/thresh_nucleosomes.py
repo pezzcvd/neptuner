@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, math
 import pandas as pd
 import numpy as np
 
@@ -35,6 +35,17 @@ def thresh_nucleosomes(ipt, opt, thr):
     occ[occ < thr] = 0
     # Retrieve coordinates
     nucleosomes = coordinates(occ)
+    # Extend intervals to 150bp
+    nucleosomes = padding(nucleosomes[0], nucleosomes[1], nucleosomes[2])
+    # Set condition
+    olap_r = st[1:] > en[:-1]
+    olap_l = np.append(olap_r[1:], True)
+    condition = np.where(olap_r & olap_l)[0] + 1
+    wd_nucs = well_defined(nucleosomes[0], nucleosomes[1], condition)
+    fz_nucs = fuzzy(nucleosomes[0], nucleosomes[1], condition)
+    # Combining
+    nucleosomes = nucleosome_coordinates(wd_nucs, fz_nucs)
+
     # Write output file
     pd.DataFrame({'start': nucleosomes[0], 'end': nucleosomes[1], "length": nucleosomes[2]}).to_csv(opt)
     return
@@ -44,11 +55,54 @@ def thresh_nucleosomes(ipt, opt, thr):
 def coordinates(pr):
     # Retrieve the signal above the threshold coordinates
     pos = np.where(pr > 0)[0]
-    idx = np.append(True, np.diff(pr) > 1)
-    st = pos[idx] + 1
-    en = pos[idx]
+    idx = np.append(0, np.where(np.diff(pos) > 1)[0])
+    st = pos[idx[:-1] + 1]
+    en = pos[idx[1:]]
     ln = en - st
     return np.array([st, en, ln])
+
+
+def padding(s, e, l):
+    idx = np.where(l < 150)[0]
+    rest = np.zeros(l.size)
+    rest[idx] = np.ceil((150 - l[idx])/2)
+    s = s - rest
+    e = e + rest
+    return np.array(s, e, l)
+
+#olap_r = st[1:] > en[:-1]
+#olap_l = np.append(olap_r[1:], True)
+#cnd = np.where(olap_r & olap_l)[0] + 1
+
+
+def well_defined(s, e, cnd):
+    # Identify well-defined peaks coordinates
+
+    wdst = s[cnd]
+    wden = e[cnd]
+    wdln = wden - wdst
+    return np.array([wdst, wden, wdln])
+
+
+def fuzzy(s, e, cnd):
+    # Identify fuzzy peaks coordinates
+
+    fzst = s[cnd[np.where(np.diff(cnd) - 1 > 1)[0]] + 1]
+    fzen = e[cnd[np.where(np.diff(cnd) - 1 > 1)[0] + 1] - 1]  # to fix one number in append
+    fzln = fzen - fzst
+    return np.array([fzst, fzen, fzln])
+
+
+def nucleosome_coordinates(wd, fz):
+    # List all nucleosomes coordinates
+
+    nucst = np.append(wd[0], fz[0])
+    nucst = np.sort(nucst)
+
+    nucen = np.append(wd[1], fz[1])
+    nucen = np.sort(nucen)
+    nucln = nucen - nucst
+    return np.array([nucst, nucen, nucln])
 
 ###-END FUNCTIONS-###
 
