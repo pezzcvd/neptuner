@@ -1,8 +1,11 @@
-import sys, os, math
+import sys, os
 import pandas as pd
 import numpy as np
 
+
 ###-MAIN FUNCTION-###
+
+
 def thresh_nucleosomes(ipt, opt, thr):
     ## Identify nucleosome coordinates from profile, exploting a threshold value
 
@@ -38,7 +41,7 @@ def thresh_nucleosomes(ipt, opt, thr):
     # Extend intervals to 150bp
     nucleosomes = padding(nucleosomes[0], nucleosomes[1], nucleosomes[2])
     # Set condition
-    olap_r = st[1:] > en[:-1]
+    olap_r = nucleosomes[0][1:] > nucleosomes[1][:-1]
     olap_l = np.append(olap_r[1:], True)
     condition = np.where(olap_r & olap_l)[0] + 1
     wd_nucs = well_defined(nucleosomes[0], nucleosomes[1], condition)
@@ -50,7 +53,9 @@ def thresh_nucleosomes(ipt, opt, thr):
     pd.DataFrame({'start': nucleosomes[0], 'end': nucleosomes[1], "length": nucleosomes[2]}).to_csv(opt)
     return
 
+
 ###-INTERNAL FUNCTIONS-###
+
 
 def coordinates(pr):
     # Retrieve the signal above the threshold coordinates
@@ -62,17 +67,14 @@ def coordinates(pr):
     return np.array([st, en, ln])
 
 
-def padding(s, e, l):
-    idx = np.where(l < 150)[0]
-    rest = np.zeros(l.size)
-    rest[idx] = np.ceil((150 - l[idx])/2)
+def padding(s, e, le):
+    idx = np.where(le < 150)[0]
+    rest = np.zeros(le.size)
+    rest[idx] = np.ceil((150 - le[idx])/2)
     s = s - rest
     e = e + rest
-    return np.array(s, e, l)
+    return np.array(s, e, le)
 
-#olap_r = st[1:] > en[:-1]
-#olap_l = np.append(olap_r[1:], True)
-#cnd = np.where(olap_r & olap_l)[0] + 1
 
 
 def well_defined(s, e, cnd):
@@ -104,7 +106,9 @@ def nucleosome_coordinates(wd, fz):
     nucln = nucen - nucst
     return np.array([nucst, nucen, nucln])
 
+
 ###-END FUNCTIONS-###
+
 
 #input = '/home/pejo/Scrivania/chr1.bedgraph'
 #output = "/home/pejo/Scrivania/prova.csv"

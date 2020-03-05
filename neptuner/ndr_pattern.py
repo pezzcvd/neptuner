@@ -2,7 +2,9 @@ import os, sys
 import pandas as pd
 import numpy as np
 
+
 ###-MAIN FUNCTION-###
+
 
 def ndr_pattern(annotation, profile, nucleosome, chr_name, output):
     input_controls(annotation, profile, nucleosome, chr_name, output)
@@ -33,7 +35,9 @@ def ndr_pattern(annotation, profile, nucleosome, chr_name, output):
     new_annot.to_csv(output, index=False)
     return
 
+
 ###-INTERNAL FUNCTIONS-###
+
 
 def input_controls(a, p, n, c, o):
     # Assertions on parameters
@@ -94,7 +98,7 @@ def input_controls(a, p, n, c, o):
     assert all([isinstance(occ[i], np.float64) for i in range(pro.shape[0])])
 
     # Further controls on nucleosomes file
-    nuc = pd.read_csv(nucleosome)
+    nuc = pd.read_csv(n)
     # Nucleosomes file has at three fields
     assert nuc.shape[1] == 3
     # First column (start) is integer
@@ -108,7 +112,7 @@ def input_controls(a, p, n, c, o):
     assert all([isinstance(ln[i], np.int64) for i in range(nuc.shape[0])])
 
     # Further controls on chr_name
-    assert chr_name in anno["seqnames"].unique()
+    assert c in anno["seqnames"].unique()
     return
 
 
@@ -322,12 +326,14 @@ def extended_annotation(a, r, p):
     finalannot = finalannot.join(newinfo)
     return finalannot
 
+
 ###-END FUNCTIONS-###
 
-annotation = sys.argv[1]
-profile = sys.argv[2]
-nucleosome = sys.argv[3]
-chr_name = sys.argv[4]
+
+annotatio = sys.argv[1]
+profil = sys.argv[2]
+nucleosom = sys.argv[3]
+chr_nam = sys.argv[4]
 output = sys.argv[5]
 
-ndr_pattern(annotation, profile, nucleosome, chr_name, output)
+ndr_pattern(annotatio, profil, nucleosom, chr_nam, output)

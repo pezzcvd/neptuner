@@ -5,6 +5,7 @@ import sys, os, math
 
 ###-MAIN FUNCTION-###
 
+
 def profile(ipt, opt):
     ## Calculates the nucleosome profile from bed file containing read coordinates
 
@@ -22,7 +23,7 @@ def profile(ipt, opt):
     # Bedfile loading and preprocessing
     global bedfile
     bedfile = bedfile_preproc(ipt)
-    chr = bedfile["chromosome"][0]
+    chro = bedfile["chromosome"][0]
     # Identifying highest coordinate
     fin = np.max(bedfile["end"])
     # final array declaration
@@ -42,11 +43,13 @@ def profile(ipt, opt):
     norm_prof = normalize(prof)
 
     # Write output
-    pd.DataFrame({'chr': np.array(chr), 'start': np.arange(norm_prof.size) + 1,
+    pd.DataFrame({'chr': np.array(chro), 'start': np.arange(norm_prof.size) + 1,
                   'end': np.arange(norm_prof.size) + 2, "score": norm_prof}).to_csv(opt, index=False, header=False)
     return
 
+
 ###-INTERNAL FUNCTIONS-###
+
 
 def bedfile_preproc(bfi):
     # It loads the csv file given by the user, name the fields and filters reads shorter than 100bp or
@@ -130,11 +133,14 @@ def triangle(tot, st, en, co):
     tot[(st - co):(en + 1 - co)] = tot[(st - co):(en + 1 - co)] + curtrg
     return tot
 
+
 def normalize(pr):
     # Normalize the final profile so that is in the range [0, 1]
     return np.divide(pr, max(pr))
 
+
 ###-END FUNCTIONS-###
+
 
 # User parameteres
 input = sys.argv[1]

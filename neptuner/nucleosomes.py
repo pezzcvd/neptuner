@@ -2,7 +2,9 @@ import sys, os
 import pandas as pd
 import numpy as np
 
+
 ###-MAIN FUNCTION-###
+
 
 def nucleosomes(ipt, opt):
     ## Identify nucleosome coordinates from profile, including well-defined and fuzzy nucleosomes.
@@ -37,28 +39,28 @@ def nucleosomes(ipt, opt):
     peaks = peakdetect(occ, lookahead=50)
 
     # Get maximum positions
-    indexesMax = np.array([peaks[0][el][0] for el in range(len(peaks[0]))])
-    # Get minimum positions
-    indexesMin = np.array([peaks[1][el][0] for el in range(len(peaks[1]))])
+    indexesmax = np.array([peaks[0][el][0] for el in range(len(peaks[0]))])
     # Get maximum values
-    valsMax = np.array([peaks[0][el][1] for el in range(len(peaks[0]))])
+    valsmax = np.array([peaks[0][el][1] for el in range(len(peaks[0]))])
     # Get minimum values
-    valsMin = np.array([peaks[1][el][1] for el in range(len(peaks[1]))])
+    valsmin = np.array([peaks[1][el][1] for el in range(len(peaks[1]))])
     # Establish nucleosome intervals [max - 75, max + 75]
-    st = indexesMax - 75
-    en = indexesMax + 75
+    st = indexesmax - 75
+    en = indexesmax + 75
 
-    fcond = nucleosome_conditions(st, en, valsMax, valsMin)
+    fcond = nucleosome_conditions(st, en, valsmax, valsmin)
     well_defined_peaks = well_defined(st, en, fcond)
     fuzzy_peaks = fuzzy(st, en, fcond)
     rest_peaks = rest(st, en, fcond)
-    nucleosomes = nucleosome_coordinates(well_defined_peaks, fuzzy_peaks, rest_peaks)
+    nucleos = nucleosome_coordinates(well_defined_peaks, fuzzy_peaks, rest_peaks)
 
     # Writing output file
-    pd.DataFrame({'start': nucleosomes[0], 'end': nucleosomes[1], "length": nucleosomes[2]}).to_csv(opt, index=False)
+    pd.DataFrame({'start': nucleos[0], 'end': nucleos[1], "length": nucleos[2]}).to_csv(opt, index=False)
     return
 
+
 ###-INTERNAL FUNCTIONS-###
+
 
 def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
     """
@@ -158,6 +160,7 @@ def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
 
     return maxtab, mintab
 
+
 def nucleosome_conditions(s, e, ma, mi):
     # Selects indexes of well-defined nucleosomes, setting some conditions:
     # nuclesomes must not overlap and peak height must be at least twice as high as the sorrounding minima
@@ -174,6 +177,7 @@ def nucleosome_conditions(s, e, ma, mi):
     # Applying conditions to select well-defined peaks
     return np.where(olap_r[:-1] & olap_l[:-1] & l_h_check[:-1] & r_h_check[1:])[0] + 1
 
+
 def well_defined(s, e, cnd):
     # Identify well-defined peaks coordinates
 
@@ -181,6 +185,7 @@ def well_defined(s, e, cnd):
     wden = e[cnd]
     wdln = wden - wdst
     return np.array([wdst, wden, wdln])
+
 
 def fuzzy(s, e, cnd):
     # Identify fuzzy peaks coordinates
@@ -191,6 +196,7 @@ def fuzzy(s, e, cnd):
     fzln = fzen - fzst
     return np.array([fzst, fzen, fzln])
 
+
 def rest(s, e, cnd):
     # Identify rest of peaks (special case)
 
@@ -200,7 +206,8 @@ def rest(s, e, cnd):
     restln = resten - restst
     return np.array([restst, resten, restln])
 
-def nucleosome_coordinates(wd, fz,rs):
+
+def nucleosome_coordinates(wd, fz, rs):
     # List all nucleosomes coordinates
 
     nucst = np.append(wd[0], fz[0])
@@ -213,7 +220,9 @@ def nucleosome_coordinates(wd, fz,rs):
     nucln = nucen - nucst
     return np.array([nucst, nucen, nucln])
 
+
 ###-END FUNCTIONS-###
+
 
 # User parameters
 input = sys.argv[1]

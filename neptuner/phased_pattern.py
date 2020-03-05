@@ -2,7 +2,9 @@ import sys
 import numpy as np
 import pandas as pd
 
+
 ###-MAIN FUNCTION-###
+
 
 def phased_pattern(ipt, opt):
     ## Identify phased patterns, arrays of nucleosomes that lie at regular distance from each other
@@ -30,7 +32,9 @@ def phased_pattern(ipt, opt):
     pd.DataFrame({'start': phased_r[0], 'end': phased_r[1], "length": phased_r[1] - phased_r[0]}).to_csv(opt, index=False)
     return
 
+
 ###-INTERNAL FUNCTIONS-###
+
 
 def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
     """
@@ -130,13 +134,15 @@ def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
 
     return maxtab, mintab
 
+
 def extrema(pr):
     # Finds maxima and minima and orders them
     peaks = peakdetect(pr, lookahead=50)
-    indexesMax = np.array([peaks[0][el][0] for el in range(len(peaks[0]))])
-    indexesMin = np.array([peaks[1][el][0] for el in range(len(peaks[1]))])
-    extrema = np.sort(np.concatenate((indexesMax, indexesMin)))
+    indexesmax = np.array([peaks[0][el][0] for el in range(len(peaks[0]))])
+    indexesmin = np.array([peaks[1][el][0] for el in range(len(peaks[1]))])
+    extrema = np.sort(np.concatenate((indexesmax, indexesmin)))
     return extrema
+
 
 def phased_indexes(cd):
     # retrieves distance between peaks
@@ -146,6 +152,7 @@ def phased_indexes(cd):
     # keeps only those elements with a width different from 0
     rridx = np.where(rr != 0)[0]
     return rridx
+
 
 def populate(cd, rri):
     # Sets first element coordinates of phased regions
@@ -162,6 +169,7 @@ def populate(cd, rri):
             st = np.append(st, cd[el[1]])
             en = np.append(en, cd[el[1] + 1])
     return np.array([st, en])
+
 
 ###-END FUNCTIONS-###
 
