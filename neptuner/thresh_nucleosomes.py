@@ -4,6 +4,7 @@ import numpy as np
 
 
 ###-MAIN FUNCTION-###
+# USAGE: python3 thresh_nucleosomes.py input.bedgraph output.txt threshold
 
 
 def thresh_nucleosomes(ipt, opt, thr):

@@ -4,6 +4,7 @@ import numpy as np
 
 
 ###-MAIN FUNCTION-###
+# USAGE: pyhton3 nucleosomes.py input.bedgraph output.txt
 
 
 def nucleosomes(ipt, opt):
@@ -190,9 +191,8 @@ def well_defined(s, e, cnd):
 def fuzzy(s, e, cnd):
     # Identify fuzzy peaks coordinates
 
-    fzst = np.append(1, s[cnd[np.where(np.diff(cnd) - 1 > 1)[0]] + 1])
-    fzen = np.append(e[cnd[np.where(np.diff(cnd) - 1 > 1)[0]] - 1][0],
-                     e[cnd[np.where(np.diff(cnd) - 1 > 1)[0] + 1] - 1])  # to fix one number in append
+    fzst = s[cnd[np.where(np.diff(cnd) - 1 > 1)[0]] + 1]
+    fzen = e[cnd[np.where(np.diff(cnd) - 1 > 1)[0] + 1] - 1]
     fzln = fzen - fzst
     return np.array([fzst, fzen, fzln])
 

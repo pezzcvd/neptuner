@@ -4,6 +4,7 @@ import numpy as np
 import sys, os, math
 
 ###-MAIN FUNCTION-###
+# USAGE: python3 profile.py input.bed output.bedgraph
 
 
 def profile(ipt, opt):

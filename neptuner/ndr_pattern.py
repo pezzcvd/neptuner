@@ -4,19 +4,20 @@ import numpy as np
 
 
 ###-MAIN FUNCTION-###
-
+## USAGE: python3 ndr_pattern.py annotation.csv profile.bedgraph nucleosomes.txt chromosome_name output.txt
 
 def ndr_pattern(annotation, profile, nucleosome, chr_name, output):
     input_controls(annotation, profile, nucleosome, chr_name, output)
     # Read input files
     annot = pd.read_csv(annotation)
     # Select one chromosome and subselect annotation file
-    annot = annot.loc[annot.seqnames == chr_name,]
+    annot = annot.loc[annot.seqnames == chr_name, ]
     # Sort genes
     annot = annot.sort_values(by=["start", "end"])
     # Add transcription starting site information
     annot["tss"] = np.sort(np.append(annot["start"][(annot['strand'] == "+")],
                                      annot["end"][(annot['strand'] == "-")]))
+    annot = annot.reset_index(drop=True)
     prof = pd.read_csv(profile, header=None)
     prof = np.array(prof[3])
     nucl = pd.read_csv(nucleosome)

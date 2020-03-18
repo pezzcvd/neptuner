@@ -4,7 +4,7 @@ import pandas as pd
 
 
 ###-MAIN FUNCTION-###
-
+# USAGE: python3 phased_pattern.py input.bedgraph output.txt
 
 def phased_pattern(ipt, opt):
     ## Identify phased patterns, arrays of nucleosomes that lie at regular distance from each other
@@ -156,18 +156,30 @@ def phased_indexes(cd):
 
 def populate(cd, rri):
     # Sets first element coordinates of phased regions
-    st = np.array(cd[rri[0]])
-    en = np.array(cd[rri[0] + 1])
+    st = 0
+    en = 0
+    st = np.append(st, np.array(cd[rri[0]]))
+    en = np.append(en, np.array(cd[rri[0] + 1]))
     # Populates the two vectors
     # Scans the indexes of regular regions,
     # identifies clusters of consecutive indexes
     # and takes the correspondent genomic coordinates as coordinates of phased regions
-    for el in zip(rri[:-1], rri[1:]):
-        if el[1] - el[0] == 1:
-            en[-1] = cd[el[1] + 1]
+    #for el in zip(rri[:-1], rri[1:]):
+    #for el in np.arange(rri):
+    #    if np.diff(rri)[el + 1] == 1:
+    #        en[-1] = cd[el]
+    #    if el[1] - el[0] == 1:
+    #        en[-1] = cd[el[1] + 1]
+     #   else:
+      #      en[-1] = cd[el[1] - 1]
+       #     st = np.append(st, cd[el[1]])
+        #    en = np.append(en, cd[el[1] + 1])
+    for el in np.arange(1, rri.size):
+        if np.diff(rri)[el - 1] == 1:
+            en[-1] = cd[el + 1]
         else:
-            st = np.append(st, cd[el[1]])
-            en = np.append(en, cd[el[1] + 1])
+            st = np.append(st, cd[el - 1])
+            en = np.append(en, cd[el])
     return np.array([st, en])
 
 
