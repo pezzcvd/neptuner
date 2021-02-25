@@ -32,7 +32,7 @@ def profile(ipt, opt):
     old = np.zeros(fin + 1)
     # Rows per subfile (used in the subfile function)
     global rps
-    rps = math.ceil(bedfile.shape[0] / ncpu)
+    rps = math.ceil(bedfile.shape[0] // ncpu)
 
     # Parallel profile computation
     pool = mp.Pool(ncpu)  # mp.cpu_count())
@@ -41,11 +41,15 @@ def profile(ipt, opt):
     prof = np.sum(prof, axis=0)
 
     # Normalization
-    norm_prof = normalize(prof)
+#    norm_prof = normalize(prof)
 
     # Write output
-    pd.DataFrame({'chr': np.array(chro), 'start': np.arange(norm_prof.size) + 1,
-                  'end': np.arange(norm_prof.size) + 2, "score": norm_prof}).to_csv(opt, index=False, header=False)
+#    pd.DataFrame({'chr': np.array(chro), 'start': np.arange(norm_prof.size) + 1,
+#                  'end': np.arange(norm_prof.size) + 2, "score": norm_prof}).to_csv(opt, index=False, header=False)
+    pd.DataFrame({'chr': np.array(chro), 'start': np.arange(prof.size) + 1,
+                  'end': np.arange(prof.size) + 2, "score": prof}).to_csv(opt, index=False, header=False)
+    print(max(prof))
+#    print(max(norm_prof))
     return
 
 
@@ -60,9 +64,9 @@ def bedfile_preproc(bfi):
     bf = pd.read_csv(bfi, sep='\t', header=None)
     # Additional controls
     # First column (chromosome) is a string and all are the same
-    assert bf.shape[1] == 3
+    assert bf.shape[1] >= 3
     assert bf[0].unique().size == 1
-    assert isinstance(bf[0][0], str)
+    #assert isinstance(bf[0][0], str)
     # Second column (start) is integer
     a = np.array(bf[1])
     assert all([isinstance(a[i], np.int64) for i in range(bf.shape[0])])
@@ -71,10 +75,11 @@ def bedfile_preproc(bfi):
     assert all([isinstance(a[i], np.int64) for i in range(bf.shape[0])])
 
     # Rename columns
+    bf = bf.iloc[:, 0:3]
     bf.rename(columns={0: "chromosome", 1: "start", 2: "end"}, inplace=True)
     bf["length"] = bf["end"] - bf["start"]
     # Filtering reads shorter than 100bp or longer than 200bp
-    bf = bf[(bf["length"] < 200) & (bf["length"] > 100)]
+    #bf = bf[(bf["length"] < 200) & (bf["length"] > 100)]
     bf = bf.reset_index(drop=True)
     return bf
 
@@ -95,6 +100,7 @@ def subfiles(i):
     # Defines the subfile result file initialized with zeros
     new = np.zeros(np.max(subf["end"]) - np.min(subf["start"]) + 1)
     st = np.array(subf["start"])
+    start = max(np.min(subf["start"]) - 1, 0)
     en = np.array(subf["end"])
     # Index of the smallest coordinate for this subfile
     # Used to correctly integrate the result chunks in the correct position of the final result
@@ -102,7 +108,7 @@ def subfiles(i):
     # Apply the triangle kernel to the subfile
     new = [triangle(new, s, e, count) for s, e in np.nditer([st, en])][-1]
     # Integrate the result chunk in the complete result vector at the corresponding position
-    old[np.min(subf["start"]) - 1:np.max(subf["end"])] = old[np.min(subf["start"] - 1):np.max(subf["end"])] + new
+    old[np.min(subf["start"]):np.max(subf["end"])+1] = old[np.min(subf["start"]):np.max(subf["end"])+1] + new
     return old
 
 
