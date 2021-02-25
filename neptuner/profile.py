@@ -1,10 +1,11 @@
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
+from scipy.stats import poisson
 import sys, os, math
 
 ###-MAIN FUNCTION-###
-# USAGE: python3 profile.py input.bed output.bedgraph
+# USAGE: python3 profile.py <input.bed> outfile_noextension
 
 
 def profile(ipt, opt):
@@ -17,13 +18,13 @@ def profile(ipt, opt):
     assert ipt.endswith(".bed")
     # Output is a bedgraph file
     assert isinstance(opt, str)
-    assert opt.endswith(".bedgraph")
+    #assert opt.endswith(".bedgraph")
 
     # Number of cpus
     ncpu = mp.cpu_count()
     # Bedfile loading and preprocessing
     global bedfile
-    bedfile = bedfile_preproc(ipt)
+    bedfile = bedfile_preproc(ipt, opt)
     chro = bedfile["chromosome"][0]
     # Identifying highest coordinate
     fin = np.max(bedfile["end"])
@@ -47,7 +48,7 @@ def profile(ipt, opt):
 #    pd.DataFrame({'chr': np.array(chro), 'start': np.arange(norm_prof.size) + 1,
 #                  'end': np.arange(norm_prof.size) + 2, "score": norm_prof}).to_csv(opt, index=False, header=False)
     pd.DataFrame({'chr': np.array(chro), 'start': np.arange(prof.size) + 1,
-                  'end': np.arange(prof.size) + 2, "score": prof}).to_csv(opt, index=False, header=False)
+                  'end': np.arange(prof.size) + 2, "score": prof}).to_csv(opt+".bedgraph", index=False, header=False)
     print(max(prof))
 #    print(max(norm_prof))
     return
@@ -56,7 +57,24 @@ def profile(ipt, opt):
 ###-INTERNAL FUNCTIONS-###
 
 
-def bedfile_preproc(bfi):
+def readstack(o, ss, ee):
+    o[ss:ee+1] += 1
+
+
+def getpvals(st, en, outp):
+    lng = max(en)
+    old = np.array([0] * lng)
+    [readstack(old, sta, end) for sta, end in np.nditer([st, en])][-1]
+
+    expect = poisson.rvs(np.mean(old), size=10000)
+    pvals = poisson.pmf(old, np.mean(old))
+
+    pd.DataFrame({'pval': pvals}).to_csv(outp+"_pvals.csv",
+                                         index=False, header=False)
+    return
+
+
+def bedfile_preproc(bfi, outpu):
     # It loads the csv file given by the user, name the fields and filters reads shorter than 100bp or
     # longer than 200bp. After the preprocessing the file is ready to be used for the profile calculation.
 
@@ -81,6 +99,9 @@ def bedfile_preproc(bfi):
     # Filtering reads shorter than 100bp or longer than 200bp
     #bf = bf[(bf["length"] < 200) & (bf["length"] > 100)]
     bf = bf.reset_index(drop=True)
+
+    getpvals(bf["start"], bf["end"], outpu)
+
     return bf
 
 
