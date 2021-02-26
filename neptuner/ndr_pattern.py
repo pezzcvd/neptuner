@@ -1,13 +1,17 @@
 import os, sys
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import LinearRegression
 
 
 ###-MAIN FUNCTION-###
-## USAGE: python3 ndr_pattern.py annotation.csv profile.bedgraph nucleosomes.txt chromosome_name output.txt
+## USAGE: python3 ndr_pattern.py <annotation.csv> <profile.bedgraph> <nucleosomes.txt> chromosome_name <output.txt>
 
-def ndr_pattern(annotation, profile, nucleosome, chr_name, output):
-    input_controls(annotation, profile, nucleosome, chr_name, output)
+def ndr_pattern(annotation, profile, nucleosome, chr_name, outp):
+    # Input controls
+    input_controls(annotation, profile, nucleosome, chr_name, outp)
+
+    # Read tables for the different parameters and setup
     # Read input files
     annot = pd.read_csv(annotation)
     # Select one chromosome and subselect annotation file
@@ -17,23 +21,41 @@ def ndr_pattern(annotation, profile, nucleosome, chr_name, output):
     # Add transcription starting site information
     annot["tss"] = np.sort(np.append(annot["start"][(annot['strand'] == "+")],
                                      annot["end"][(annot['strand'] == "-")]))
+    # Filter out uORF genes
+    names = annot["Name"].to_numpy()
+    names = names.astype(str)
+    namesid = np.where(np.char.endswith(names, "-uORF"))[0]
+    annot = annot.reset_index(drop=True)
+    annot = annot.drop(namesid, axis=0)
+    # Reset row numbers
     annot = annot.reset_index(drop=True)
     prof = pd.read_csv(profile, header=None)
     prof = np.array(prof[3])
     nucl = pd.read_csv(nucleosome)
 
-    maxima = extrema(prof)
+    # Operations
+    # Peak calculation, it has to be outside the function!!!
+    peaks = peakdetect(prof, lookahead=50)
 
+    # Maxima positions
+    maxima = extrema(peaks)
+
+    # Fitting a linear model to genes profile extrema and retrieving slope
+#    slope = np.array([lm_intercept(annot.iloc[r], peaks) for r in range(2, annot.shape[0])])
+    # identifying promoter regions
     promoters = promoter(annot)
     # Set intervals for nucleosomes and promoters
     nucint = np.array([pd.Interval(a, b) for a, b in zip(nucl["start"], nucl["end"])])
     promint = np.array([pd.Interval(a, b) for a, b in zip(promoters["start"], promoters["end"])])
     # Calculate info for plus1 and minus peaks
-    pm_peaks = [plusminus1(r, promoters, nucl, promint, nucint, maxima) for r in range(1, promoters.shape[0])]
+    pm_peaks = [plusminus1(r, promoters, nucl, promint, nucint, maxima) for r in range(3, promoters.shape[0])]
 
     new_annot = extended_annotation(annot, pm_peaks, promoters)
+    naidx = np.where(pd.isnull(new_annot["ndr_pattern"]))[0]
+    new_annot.loc[naidx, "ndr_pattern"] = False
+
     # DIRE PATTERN SI/NO
-    new_annot.to_csv(output, index=False)
+    new_annot.to_csv(outp, index=False)
     return
 
 
@@ -216,15 +238,47 @@ def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
     return maxtab, mintab
 
 
-def extrema(pr):
+def extrema(pe):
     # Idenfity extrema
-
-    peaks = peakdetect(pr, lookahead=50)
-    toolow = np.where(np.array([peaks[0][c][1] < 0.1 for c in range(len(peaks[0]))]))
-    maxpos = np.array([peaks[0][c][0] for c in range(len(peaks[0]))])
+    toolow = np.where(np.array([pe[0][c][1] < 0.1 for c in range(len(pe[0]))]))
+    maxpos = np.array([pe[0][c][0] for c in range(len(pe[0]))])
     maxpos = np.delete(maxpos, toolow)
-    minpos = np.array([peaks[1][c][0] for c in range(len(peaks[1]))])
     return maxpos
+
+
+def lm_intercept(an, pe):
+    # Maxima calculation, positions and values
+    maxp = np.array([pe[0][c][0] for c in range(len(pe[0]))])
+    toolow = np.where(np.array([pe[0][c][1] < 0.1 for c in range(len(pe[0]))]))[0]
+    idx1 = np.intersect1d(np.where(maxp > an[1])[0], np.where(maxp < an[2])[0])
+    idx1 = np.delete(idx1, toolow)
+    maxp = maxp[idx1]
+    maxv = np.array([pe[0][c][1] for c in range(len(pe[0]))])
+    maxv = maxv[idx1]
+
+    # Minima calculation, positions and values
+    minp = np.array([pe[1][c][0] for c in range(len(pe[1]))])
+    toolow = np.where(np.array([pe[0][c][1] < 0.1 for c in range(len(pe[0]))]))
+    idx2 = np.intersect1d(np.where(minp > an[1])[0], np.where(minp < an[2])[0])
+    idx2 = np.delete(idx2, toolow)
+    minp = minp[idx2]
+    minv = np.array([pe[1][c][1] for c in range(len(pe[1]))])
+    minv = minv[idx2]
+
+    # Joining positions and values vectors to set up x and y for the linear regression
+    x = np.append(maxp, minp).reshape((-1, 1))
+    y = np.append(maxv, minv)
+
+    try:
+        # Model fitting
+        model = LinearRegression().fit(x, y)
+        # If the strand is negative we multiply the slope by -1
+        if an[4] == "-":
+            model.intercept_ = -model.intercept_
+
+        return model.intercept_
+    except ValueError:
+        return np.nan
 
 
 def promoter(a):
@@ -296,14 +350,17 @@ def peaks_coordinates(strand, cand, candmax, candpos):
 
 
 def plusminus1(i, p, nu, pi, ni, mx):
-    # positions of nucleosomes that overlap the promoter region
-    olaps = np.where(np.array([pi[i].overlaps(n) for n in ni]))[0]
-    # If there are overlaps
-    if olaps.shape[0] > 0:
-        candidates = find_candidates(p.iloc[i]["strand"], nu, olaps, mx)
-        plmi1 = peaks_coordinates(p.iloc[i]["strand"], candidates[0], candidates[1], candidates[2])
-        return plmi1
-    else:
+    try:
+        # positions of nucleosomes that overlap the promoter region
+        olaps = np.where(np.array([pi[i].overlaps(n) for n in ni]))[0]
+        # If there are overlaps
+        if olaps.shape[0] > 0:
+            candidates = find_candidates(p.iloc[i]["strand"], nu, olaps, mx)
+            plmi1 = peaks_coordinates(p.iloc[i]["strand"], candidates[0], candidates[1], candidates[2])
+            return plmi1
+        else:
+            return np.nan, np.nan, np.nan, np.nan
+    except:
         return np.nan, np.nan, np.nan, np.nan
 
 
