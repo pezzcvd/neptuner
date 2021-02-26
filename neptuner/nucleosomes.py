@@ -4,7 +4,7 @@ import numpy as np
 
 
 ###-MAIN FUNCTION-###
-# USAGE: pyhton3 nucleosomes.py input.bedgraph output.txt
+# USAGE: pyhton3 nucleosomes.py input_noextension <output.txt>
 
 
 def nucleosomes(ipt, opt):
@@ -13,17 +13,17 @@ def nucleosomes(ipt, opt):
     # Assertions on parameters
     # Input is a string and a bedgraph file
     assert isinstance(ipt, str)
-    assert os.path.isfile(ipt)
-    assert ipt.endswith(".bedgraph")
+    #assert os.path.isfile(ipt)
+    #assert ipt.endswith(".bedgraph")
     # Output is a bedgraph file
     assert isinstance(opt, str)
     assert opt.endswith(".txt")
 
     # Read the input file
-    prof = pd.read_csv(ipt, header=None)
+    prof = pd.read_csv(ipt+".bedgraph", header=None)
     assert prof.shape[1] == 4
     assert prof[0].unique().size == 1
-    assert isinstance(prof[0][0], str)
+    #assert isinstance(prof[0][0], str)
     # Second column (start) is integer
     occ = np.array(prof[1])
     assert all([isinstance(occ[i], np.int64) for i in range(prof.shape[0])])
@@ -33,7 +33,7 @@ def nucleosomes(ipt, opt):
     # Third column (end) is integer
     occ = np.array(prof[3])
     assert all([isinstance(occ[i], np.float64) for i in range(prof.shape[0])])
-    occ[occ < 0.05] = 0
+    occ[occ < 0.05] = 0 #max(occ) - (max(occ) * 0.95)
 
     # finds indexes of peaks above the threshold (dummy, very low value)
     # and with at least 50bp distance ideal to remove little bumps
@@ -41,15 +41,44 @@ def nucleosomes(ipt, opt):
 
     # Get maximum positions
     indexesmax = np.array([peaks[0][el][0] for el in range(len(peaks[0]))])
+    indexesmin = np.array([peaks[1][el][0] for el in range(len(peaks[1]))])
+
+    # fixlengths
+    if indexesmax[0] < indexesmin[0]:
+        indexesmax = indexesmax[1:]
+    if indexesmax[-1] > indexesmin[-1]:
+        indexesmax = indexesmax[:-1]
+#    # Pvals filtering
+
+    pvals = pd.read_csv(ipt + "_pvals.csv", header=None)
+    pvals = np.array(pvals[0])
+    sig = np.where(pvals[indexesmax] < 1e-3)[0]
+    lst = sig[-1]
+    #sig1 = sig[:-1]
+    indexesmax = indexesmax[sig]
+    indminbef = indexesmin[sig]
+    indminaft = np.append(indexesmin[sig][1:], indexesmin[lst + 1])
+
+
     # Get maximum values
     valsmax = np.array([peaks[0][el][1] for el in range(len(peaks[0]))])
+    valsmax = valsmax[sig]
     # Get minimum values
     valsmin = np.array([peaks[1][el][1] for el in range(len(peaks[1]))])
+    valsminbef = valsmin[sig]
+    valsminaft = np.append(valsmin[sig][1:], valsmin[lst + 1])
+
+
+    #if indexesmax[0] > indexesmin[0]:
+        #valsmin = valsmin[1:]
+    #if indexesmax[-1] < indexesmin[-1]:
+        #valsmin = valsmin[:-1]
+
     # Establish nucleosome intervals [max - 75, max + 75]
     st = indexesmax - 75
     en = indexesmax + 75
 
-    fcond = nucleosome_conditions(st, en, valsmax, valsmin)
+    fcond = nucleosome_conditions(st, en, valsmax, valsminbef, valsminaft)
     well_defined_peaks = well_defined(st, en, fcond)
     fuzzy_peaks = fuzzy(st, en, fcond)
     rest_peaks = rest(st, en, fcond)
@@ -162,21 +191,21 @@ def peakdetect(y_axis, x_axis=None, lookahead=500, delta=0):
     return maxtab, mintab
 
 
-def nucleosome_conditions(s, e, ma, mi):
+def nucleosome_conditions(s, e, ma, mib, mia):
     # Selects indexes of well-defined nucleosomes, setting some conditions:
     # nuclesomes must not overlap and peak height must be at least twice as high as the sorrounding minima
 
     # Setting conditions
     # Overlapping nucleosomes on the right
-    olap_r = s[1:] > e[:-1]  # parte dal -primo
+    olap = s[1:] > e[:-1]  # parte dal -primo
     # Overlapping nucleosomes on the left
-    olap_l = np.append(olap_r[1:], True)
+    #olap_l = np.append(olap_r[1:], True)
     # Current maximum is higher than two times the minimumm on the left
-    l_h_check = ma[1:] / 2 > mi  # parte dal primo minimo e secondo massimo
+    l_h_check = ma / 2 > mib  # parte dal primo minimo e secondo massimo
     # Current maximum is higher than two times the minimumm on the right
-    r_h_check = ma[:-1] / 2 > mi  # parte dal secondo
+    r_h_check = ma / 2 > mia  # parte dal secondo
     # Applying conditions to select well-defined peaks
-    return np.where(olap_r[:-1] & olap_l[:-1] & l_h_check[:-1] & r_h_check[1:])[0] + 1
+    return np.where(olap & l_h_check[:-1] & r_h_check[1:])[0] + 1
 
 
 def well_defined(s, e, cnd):
