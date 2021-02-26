@@ -4,7 +4,7 @@ import numpy as np
 
 
 ###-MAIN FUNCTION-###
-# USAGE: python3 thresh_nucleosomes.py input.bedgraph output.txt threshold
+# USAGE: python3 thresh_nucleosomes.py <input.bedgraph> <output.txt> <threshold>
 
 
 def thresh_nucleosomes(ipt, opt, thr):
@@ -16,15 +16,12 @@ def thresh_nucleosomes(ipt, opt, thr):
     assert os.path.isfile(ipt)
     # Output is a string
     assert isinstance(opt, str)
-    # thresh is a float in the range [0, 1]
-    assert isinstance(thr, float)
-    assert 0 < thr < 1
 
     # reads profile file
     prof = pd.read_csv(ipt, header=None)
     assert prof.shape[1] == 4
     assert prof[0].unique().size == 1
-    assert isinstance(prof[0][0], str)
+    #assert isinstance(prof[0][0], str)
     # Second column (start) is integer
     occ = np.array(prof[1])
     assert all([isinstance(occ[i], np.int64) for i in range(prof.shape[0])])
@@ -34,6 +31,10 @@ def thresh_nucleosomes(ipt, opt, thr):
     # Third column (end) is integer
     occ = np.array(prof[3])
     assert all([isinstance(occ[i], np.float64) for i in range(prof.shape[0])])
+
+    # thresh is a float in the range [0, max val profile]
+    assert isinstance(thr, float)
+    assert 0 < thr < max(occ)
 
     # Thresholding
     occ[occ < thr] = 0
@@ -74,7 +75,8 @@ def padding(s, e, le):
     rest[idx] = np.ceil((150 - le[idx])/2)
     s = s - rest
     e = e + rest
-    return np.array(s, e, le)
+    le = e - s
+    return np.array([s, e, le])
 
 
 
@@ -116,6 +118,6 @@ def nucleosome_coordinates(wd, fz):
 # User parameters
 input = sys.argv[1]
 output = sys.argv[2]
-thresh = sys.argv[3]
+thresh = float(sys.argv[3])
 # Call main function
 thresh_nucleosomes(input, output, thresh)
