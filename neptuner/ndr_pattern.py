@@ -1,13 +1,14 @@
-import os, sys
-import pandas as pd
+import os
+import sys
 import numpy as np
+import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 
 ###-MAIN FUNCTION-###
-## USAGE: python3 ndr_pattern.py <annotation.csv> <profile.bedgraph> <nucleosomes.txt> chromosome_name <output.txt>
+## USAGE: python3 ndr_pattern.py <annotation.csv> <profile.bedgraph> <nucleosomes.txt> chromosome_name <output.txt> [flag]
 
-def ndr_pattern(annotation, profile, nucleosome, chr_name, outp):
+def ndr_pattern(annotation, profile, nucleosome, chr_name, outp, svmflag):
     # Input controls
     input_controls(annotation, profile, nucleosome, chr_name, outp)
 
@@ -15,7 +16,7 @@ def ndr_pattern(annotation, profile, nucleosome, chr_name, outp):
     # Read input files
     annot = pd.read_csv(annotation)
     # Select one chromosome and subselect annotation file
-    annot = annot.loc[annot.seqnames == chr_name, ]
+    annot = annot.loc[annot.seqnames == chr_name,]
     # Sort genes
     annot = annot.sort_values(by=["start", "end"])
     # Add transcription starting site information
@@ -41,18 +42,19 @@ def ndr_pattern(annotation, profile, nucleosome, chr_name, outp):
     maxima = extrema(peaks)
 
     # Fitting a linear model to genes profile extrema and retrieving slope
-#    slope = np.array([lm_intercept(annot.iloc[r], peaks) for r in range(2, annot.shape[0])])
+    #    slope = np.array([lm_intercept(annot.iloc[r], peaks) for r in range(2, annot.shape[0])])
     # identifying promoter regions
     promoters = promoter(annot)
     # Set intervals for nucleosomes and promoters
     nucint = np.array([pd.Interval(a, b) for a, b in zip(nucl["start"], nucl["end"])])
     promint = np.array([pd.Interval(a, b) for a, b in zip(promoters["start"], promoters["end"])])
     # Calculate info for plus1 and minus peaks
+    print(5)
     pm_peaks = [plusminus1(r, promoters, nucl, promint, nucint, maxima) for r in range(3, promoters.shape[0])]
+    # pm_peaks = [plusminus1(r, promoters, nucl, promint, nucint, maxima) for r in range(3, promoters.shape[0])]
 
-    new_annot = extended_annotation(annot, pm_peaks, promoters)
-    naidx = np.where(pd.isnull(new_annot["ndr_pattern"]))[0]
-    new_annot.loc[naidx, "ndr_pattern"] = False
+    print(6)
+    new_annot = extended_annotation(annot, pm_peaks, promoters, prof, svmflag)
 
     # DIRE PATTERN SI/NO
     new_annot.to_csv(outp, index=False)
@@ -353,29 +355,79 @@ def plusminus1(i, p, nu, pi, ni, mx):
     try:
         # positions of nucleosomes that overlap the promoter region
         olaps = np.where(np.array([pi[i].overlaps(n) for n in ni]))[0]
+        maxint = np.array([pd.Interval(a, b) for a, b in zip(mx, mx)])
         # If there are overlaps
         if olaps.shape[0] > 0:
-            candidates = find_candidates(p.iloc[i]["strand"], nu, olaps, mx)
-            plmi1 = peaks_coordinates(p.iloc[i]["strand"], candidates[0], candidates[1], candidates[2])
-            return plmi1
+            if p.iloc[i]["strand"] == "+":
+                pl1 = nu.iloc[olaps[0]]
+                mi1 = nu.iloc[olaps[0] - 1]
+                pl1h = mx[np.where(np.array([ni[olaps[0]].overlaps(n) for n in maxint]))[0]]
+                mi1h = mx[np.where(np.array([ni[olaps[0] - 1].overlaps(n) for n in maxint]))[0]]
+            else:
+                pl1 = nu.iloc[olaps[olaps.shape[0] - 1]]
+                mi1 = nu.iloc[olaps[olaps.shape[0] - 1] + 1]
+                pl1h = mx[np.where(np.array([ni[olaps[olaps.shape[0] - 1]].overlaps(n) for n in maxint]))[0]]
+                mi1h = mx[np.where(np.array([ni[olaps[olaps.shape[0] - 1] + 1].overlaps(n) for n in maxint]))[0]]
+
+            return pl1[0], pl1[1], mi1[0], mi1[1], pl1h[pl1h.size // 2], mi1h[mi1h.size // 2]
         else:
-            return np.nan, np.nan, np.nan, np.nan
+            return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
     except:
-        return np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
 
-def extended_annotation(a, r, p):
+# def plusminus1(i, p, nu, pi, ni, mx):
+#    try:
+#       # positions of nucleosomes that overlap the promoter region
+#      olaps = np.where(np.array([pi[i].overlaps(n) for n in ni]))[0]
+# If there are overlaps
+#     if olaps.shape[0] > 0:
+#        candidates = find_candidates(p.iloc[i]["strand"], nu, olaps, mx)
+#       plmi1 = peaks_coordinates(p.iloc[i]["strand"], candidates[0], candidates[1], candidates[2])
+#      return plmi1
+# else:
+#    return np.nan, np.nan, np.nan, np.nan
+# except:
+#   return np.nan, np.nan, np.nan, np.nan
+
+
+def extended_annotation(a, r, p, pr, flg):
     newinfo = pd.DataFrame({'plus1st': np.array([r[c][0] for c in range(len(r))]),
                             'plus1en': np.array([r[c][1] for c in range(len(r))]),
                             'minus1st': np.array([r[c][2] for c in range(len(r))]),
                             'minus1en': np.array([r[c][3] for c in range(len(r))]),
+                            'plus1hpos': np.array([r[c][4] for c in range(len(r))]),
+                            'minus1hpos': np.array([r[c][5] for c in range(len(r))]),
                             "ndr": np.maximum(np.array([r[c][0] for c in range(len(r))]) -
                                               np.array([r[c][3] for c in range(len(r))]),
                                               np.array([r[c][2] for c in range(len(r))]) -
                                               np.array([r[c][1] for c in range(len(r))]))})
-    newinfo["ndr_pattern"] = (newinfo["plus1en"] - newinfo["plus1st"] == 150) & \
-                             (newinfo["minus1en"] - newinfo["minus1st"] == 150) & \
-                             (newinfo["ndr"] > 40)
+    newinfo["plus1length"] = newinfo["plus1en"] - newinfo["plus1st"]
+    newinfo["minus1length"] = newinfo["minus1en"] - newinfo["minus1st"]
+
+    plus1height = np.array([])
+    for i in np.arange(newinfo.shape[0]):
+        if np.isfinite(newinfo.loc[i]["plus1hpos"]):
+            plus1height = np.append(plus1height, pr[int(newinfo.loc[i]["plus1hpos"])])
+        else:
+            plus1height = np.append(plus1height, float("nan"))
+    newinfo["plus1height"] = plus1height
+
+    minus1height = np.array([])
+    for i in np.arange(newinfo.shape[0]):
+        if np.isfinite(newinfo.loc[i]["minus1hpos"]):
+            minus1height = np.append(minus1height, pr[int(newinfo.loc[i]["minus1hpos"])])
+        else:
+            minus1height = np.append(minus1height, float("nan"))
+    newinfo["minus1height"] = minus1height
+
+    if flg:
+        newinfo["ndr_pattern"] = (newinfo["plus1en"] - newinfo["plus1st"] == 150) & \
+                                 (newinfo["minus1en"] - newinfo["minus1st"] == 150) & \
+                                 (newinfo["ndr"] > 40)
+        naidx = np.where(pd.isnull(newinfo["ndr_pattern"]))[0]
+        newinfo.loc[naidx, "ndr_pattern"] = False
+
     a["pStart"] = p["start"]
     a["pEnd"] = p["end"]
 
@@ -394,4 +446,9 @@ nucleosom = sys.argv[3]
 chr_nam = sys.argv[4]
 output = sys.argv[5]
 
-ndr_pattern(annotatio, profil, nucleosom, chr_nam, output)
+if len(sys.argv) > 6:
+    flag = sys.argv[6]
+else:
+    flag = False
+
+ndr_pattern(annotatio, profil, nucleosom, chr_nam, output, flag)
