@@ -1,5 +1,7 @@
 # NEPTuner
 
+![alt text](https://github.com/pezzcvd/neptuner/blob/master/img/NEPTuner_logo.jpg)
+
 NEPTuner (Nucleosome-Encrypted Pattern Tuner) is a tool for nucleosome profiling and pattern retrieval. First NEPTuner applies a new, simple and fast method for nucleosome profiling; then it detects and reports two types of nucleosome positioning patterns: phased pattern and nucleosome depleted region (NDR-) pattern. 
 
 ## Profiling
